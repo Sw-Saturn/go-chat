@@ -1,24 +1,44 @@
 package main
 
 import(
+	"flag"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+	"text/template"
+	"./trace"
 )
 
-func main(){
-	http.HandleFunc("/", func(w http.ResponseWriter,r *http.Request){
-		w.Write([]byte(`
-			<html>
-				<head>
-					<title>チャット</title>
-				</head>
-				<body>
-					チャットしましょう
-				</body>
-			</html>
-		`))
+type templateHandler struct {
+	once sync.Once
+	filename string
+	templ *template.Template
+}
+
+func (t *templateHandler)ServeHTTP(w http.ResponseWriter,r *http.Request){
+	t.once.Do(func() {
+		t.templ = template.Must(template.ParseFiles(filepath.Join("templates",t.filename)))
 	})
-	if err := http.ListenAndServe(":8080",nil);err != nil{
+	t.templ.Execute(w,r)
+}
+
+
+func main(){
+	var addr = flag.String("host",":8080","localhost")
+	flag.Parse()
+	r := newRoom()
+	r.tracer = trace.New(os.Stdout)
+	http.Handle("/chat",MustAuth(&templateHandler{filename:"chat.html"}))
+	http.Handle("/login",&templateHandler{filename:"login.html"})
+	http.Handle("/room",r)
+	//チャットルームを開始
+	go r.run()
+	//Webサーバを起動
+	log.Println("Webサーバーを開始します．ポート: ",*addr)
+
+	if err := http.ListenAndServe(*addr,nil);err != nil{
 		log.Fatal("ListenAndServe",err)
 	}
 }
