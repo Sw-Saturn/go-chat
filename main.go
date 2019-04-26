@@ -12,6 +12,7 @@ import(
 	"sync"
 	"text/template"
 	"./trace"
+	"github.com/joho/godotenv"
 )
 
 type templateHandler struct {
@@ -37,11 +38,15 @@ func (t *templateHandler)ServeHTTP(w http.ResponseWriter,r *http.Request){
 
 
 func main(){
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error Loading .env")
+	}
 	var addr = flag.String("host",":8080","localhost")
 	flag.Parse()
 	gomniauth.SetSecurityKey("セキュリティキー")
 	gomniauth.WithProviders(
-		google.New("291466367343-fm01nneeknrqdrmomot7r11rtaq313p1.apps.googleusercontent.com","z0c3sYBv6-eu3hpr7JokPywL","http://localhost:8080/auth/callback/google"),
+		google.New(os.Getenv("GOOGLE_CLIENT"),os.Getenv("GOOGLE_SECRET"),"http://localhost:8080/auth/callback/google"),
 		)
 	r := newRoom()
 	r.tracer = trace.New(os.Stdout)
