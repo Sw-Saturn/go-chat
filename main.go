@@ -21,6 +21,12 @@ type templateHandler struct {
 	templ *template.Template
 }
 
+var avatars Avatar = TryAvatars{
+	UseGravatar,
+	UseFileSystemAvatar,
+	UseAuthAvatar,
+}
+
 func (t *templateHandler)ServeHTTP(w http.ResponseWriter,r *http.Request){
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates",t.filename)))
@@ -48,7 +54,7 @@ func main(){
 	gomniauth.WithProviders(
 		google.New(os.Getenv("GOOGLE_CLIENT"),os.Getenv("GOOGLE_SECRET"),"http://localhost:8080/auth/callback/google"),
 		)
-	r := newRoom(UseGravatar)
+	r := newRoom(avatars)
 	r.tracer = trace.New(os.Stdout)
 	http.Handle("/chat",MustAuth(&templateHandler{filename:"chat.html"}))
 	http.Handle("/login",&templateHandler{filename:"login.html"})
@@ -64,6 +70,11 @@ func main(){
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	})
 	http.Handle("/room",r)
+	http.Handle("/upload",&templateHandler{filename:"upload.html"})
+	http.HandleFunc("/uploader",uploaderHandler)
+	http.Handle("/avatars/",
+		http.StripPrefix("/avatars/",
+			http.FileServer(http.Dir("./avatars"))))
 	//チャットルームを開始
 	go r.run()
 	//Webサーバを起動
